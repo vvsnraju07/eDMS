@@ -1,0 +1,81 @@
+import os
+import fitz  # PyMuPDF
+import webbrowser
+
+def load_pdfs(folder_path):
+    documents = []
+    for filename in os.listdir(folder_path):
+        if filename.endswith('.pdf'):
+            file_path = os.path.join(folder_path, filename)
+            try:
+                doc = fitz.open(file_path)
+                full_text = ""
+                for page_num in range(len(doc)):
+                    page = doc.load_page(page_num)
+                    text = page.get_text("text")  # Extract plain text
+                    full_text += text
+                documents.append({"filename": filename, "filepath": file_path, "content": full_text})
+                doc.close()
+            except Exception as e:
+                print(f'Error processing {filename}: {str(e)}')
+    return documents
+
+def count_keyword_occurrences(documents, keyword):
+    keyword_counts = {}
+    for document in documents:
+        text = document["content"]
+        count = 0
+        start = 0
+        while (index := text.lower().find(keyword.lower(), start)) != -1:
+            count += 1
+            start = index + len(keyword)
+        if count > 0:
+            keyword_counts[document["filename"]] = count
+    return keyword_counts
+
+def sort_files_by_frequency(keyword_counts):
+    sorted_files = sorted(keyword_counts.items(), key=lambda item: item[1], reverse=True)
+    return sorted_files
+
+def highlight_keyword_in_pdf(file_path, keyword):
+    doc = fitz.open(file_path)
+    keyword_lower = keyword.lower()
+    for page_num in range(len(doc)):
+        page = doc.load_page(page_num)
+        text_instances = page.search_for(keyword, quads=False)  # `quads=False` ensures rectangles, not quads
+        for inst in text_instances:
+            highlight = page.add_highlight_annot(inst)
+            highlight.update()
+    highlighted_file_path = file_path.replace('.pdf', '_highlighted.pdf')
+    doc.save(highlighted_file_path, garbage=4, deflate=True)
+    doc.close()
+    return highlighted_file_path
+
+def main(folder_path, keyword):
+    documents = load_pdfs(folder_path)
+    keyword_counts = count_keyword_occurrences(documents, keyword)
+    sorted_files = sort_files_by_frequency(keyword_counts)
+    
+    if sorted_files:
+        print("Keyword occurrences in PDF files:")
+        for filename, count in sorted_files:
+            print(f'{filename}: {count} times')
+        
+        while True:
+            chosen_file = input("Enter the filename to open and highlight (or 'exit' to quit): ")
+            if chosen_file.lower() == 'exit':
+                break
+            for doc in documents:
+                if doc["filename"] == chosen_file:
+                    highlighted_file_path = highlight_keyword_in_pdf(doc["filepath"], keyword)
+                    webbrowser.open_new(highlighted_file_path)
+                    break
+            else:
+                print("File not found. Please try again.")
+    else:
+        print("No occurrences of the keyword found in the specified folder.")
+
+if __name__ == "__main__":
+    folder_path = r'C:\\Users\\25865\\Desktop\\search'
+    keyword = input("Enter the keyword to search for: ")
+    main(folder_path, keyword)
