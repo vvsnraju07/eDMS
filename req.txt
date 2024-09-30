@@ -3,3 +3,4 @@ uvicorn
 PyMuPDF
 pydantic
 python-docx
+a2wsgi
